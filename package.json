@@ -1,0 +1,30 @@
+{
+  "name": "phase-gate",
+  "version": "1.0.0",
+  "description": "AI-powered phase-gated test plan generator and executor for implementation roadmaps",
+  "type": "module",
+  "bin": {
+    "phase-gate": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc --project tsconfig.json",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "dotenv": "^16.0.0",
+    "ora": "^8.2.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
