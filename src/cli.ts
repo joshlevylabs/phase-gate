@@ -24,7 +24,7 @@ import { render } from "./renderer.ts";
 import { savePlan, loadPlan } from "./store.ts";
 import type { OutputFormat } from "./types.ts";
 
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
 const DEFAULT_OUTPUT_DIR = "docs/test-plans";
 
 const program = new Command();
