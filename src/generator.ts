@@ -3,7 +3,7 @@
  * Reads a roadmap .md file, extracts the specified phase/milestone,
  * and generates structured test cases using Claude.
  */
-import Anthropic from "@anthropic-ai/sdk";
+import { makeClient } from "./client.ts";
 import { readFileSync } from "fs";
 import type { PhaseTestPlan, TestCase } from "./types.ts";
 
@@ -33,7 +33,7 @@ export async function generatePlan(
   const roadmapContent = readFileSync(roadmapFile, "utf8");
   const phaseSection = extractPhaseSection(roadmapContent, phase);
 
-  const client = new Anthropic({ apiKey });
+  const client = makeClient(apiKey);
 
   const response = await client.messages.create({
     model,

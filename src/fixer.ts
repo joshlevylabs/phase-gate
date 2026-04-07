@@ -3,7 +3,7 @@
  * Given a failing test case and the project context, asks Claude to diagnose
  * and apply a fix, then signals the runner to re-run the test.
  */
-import Anthropic from "@anthropic-ai/sdk";
+import { makeClient } from "./client.ts";
 import { execSync } from "child_process";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
@@ -17,7 +17,7 @@ export async function fixFailures(
   apiKey: string,
   model: string
 ): Promise<number> {
-  const client = new Anthropic({ apiKey });
+  const client = makeClient(apiKey);
   const failing = plan.tests.filter(
     (t) => t.result === "FAIL" && t.fixAttempts < MAX_FIX_ATTEMPTS
   );

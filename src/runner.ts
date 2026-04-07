@@ -8,7 +8,7 @@
 import { execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import Anthropic from "@anthropic-ai/sdk";
+import { makeClient } from "./client.ts";
 import chalk from "chalk";
 import type { TestCase, TestResult, RunSummary, PhaseTestPlan } from "./types.ts";
 
@@ -18,7 +18,7 @@ export async function runPlan(
   model: string,
   opts: { failedOnly?: boolean } = {}
 ): Promise<RunSummary> {
-  const client = new Anthropic({ apiKey });
+  const client = makeClient(apiKey);
   const start = Date.now();
 
   const toRun = opts.failedOnly
