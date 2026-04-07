@@ -7,21 +7,21 @@ import { makeClient } from "./client.ts";
 import { readFileSync } from "fs";
 import type { PhaseTestPlan, TestCase } from "./types.ts";
 
-const SYSTEM_PROMPT = `You are a senior QA engineer. Given a section of an implementation roadmap, you generate a comprehensive, executable test plan.
+const SYSTEM_PROMPT = `You are a senior QA engineer. Given a section of an implementation roadmap, you generate a focused, executable test plan.
 
 For each test case you generate:
 - id: sequential within the phase, e.g. "1.1", "1.2", "2.1"
-- category: group related tests (e.g. "Environment Setup", "Config Loader", "HTTP Server", "Build", "Type Safety", "Regression")
+- category: group related tests (e.g. "Environment Setup", "Config Loader", "HTTP Server", "Build", "Type Safety")
 - description: one clear sentence of what is being verified
-- howToTest: exact copy-pasteable shell commands or numbered steps. Use real commands like: pnpm athena:dev, curl http://localhost:3978/healthz, grep -n "pattern" src/file.ts
-- expectedResult: the exact observable outcome that constitutes PASS (specific log lines, HTTP codes, file names, output text)
-- gating: true if this test MUST pass before progressing to the next phase, false for nice-to-have tests
-- autoCommand: if the test can be verified by running a single shell command and checking its output, provide that command here
-- autoInspect: if the test is a code inspection (checking a pattern exists in a file), provide { file, pattern }
+- howToTest: exact copy-pasteable shell commands or numbered steps
+- expectedResult: the exact observable outcome that constitutes PASS
+- gating: true if this test MUST pass before progressing to the next phase, false for nice-to-have
+- autoCommand: single shell command to verify (or null)
+- autoInspect: { file, pattern } for code inspection tests (or null)
 
-Categories should include at minimum: Environment Setup, then feature-specific categories per milestone section, then Build, Type Safety, and Cleanup.
+IMPORTANT: Generate at most 25 test cases total. Focus on the most critical gating tests. Omit redundant checks.
 
-Respond ONLY with a valid JSON array of TestCase objects. No markdown, no explanation — just the JSON array.`;
+Respond ONLY with a valid JSON array. No markdown, no explanation — just the JSON array.`;
 
 export async function generatePlan(
   roadmapFile: string,
@@ -37,7 +37,7 @@ export async function generatePlan(
 
   const response = await client.messages.create({
     model,
-    max_tokens: 8192,
+    max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -72,8 +72,15 @@ For commands that require env vars, show them inline: ENV_VAR=value command`,
     // Strip possible markdown code fences
     const json = content.text.replace(/^```json?\n?/m, "").replace(/\n?```$/m, "").trim();
     tests = JSON.parse(json) as TestCase[];
-  } catch (err) {
-    throw new Error(`Failed to parse Claude response as JSON: ${err}\n\nRaw:\n${content.text}`);
+  } catch {
+    // Response may have been truncated — salvage all complete objects
+    const partial = content.text.replace(/^```json?\n?/m, "").trim();
+    const recovered = salvagePartialJson(partial);
+    if (recovered.length === 0) {
+      throw new Error(`Failed to parse Claude response as JSON. Raw response was ${partial.length} chars but yielded no valid test cases.`);
+    }
+    console.warn(`⚠ Response was truncated — recovered ${recovered.length} test cases from partial JSON.`);
+    tests = recovered;
   }
 
   // Normalize fields
@@ -99,6 +106,36 @@ For commands that require env vars, show them inline: ENV_VAR=value command`,
     gateCleared: false,
     tests,
   };
+}
+
+/**
+ * Salvages complete JSON objects from a truncated array string.
+ * Finds all {...} blocks that parse cleanly.
+ */
+function salvagePartialJson(text: string): TestCase[] {
+  const results: TestCase[] = [];
+  let depth = 0;
+  let start = -1;
+
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (text[i] === "}") {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        try {
+          const obj = JSON.parse(text.slice(start, i + 1)) as TestCase;
+          if (obj.id && obj.description) results.push(obj);
+        } catch {
+          // skip malformed object
+        }
+        start = -1;
+      }
+    }
+  }
+
+  return results;
 }
 
 /**
