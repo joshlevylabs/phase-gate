@@ -20,6 +20,6 @@ export function makeClient(apiKey: string): Anthropic {
     process.env.SONANCE_CORTEX_API_URL;
   return new Anthropic({
     apiKey,
-    ...(baseURL ? { baseURL: `${baseURL}/anthropic` } : {}),
+    ...(baseURL ? { baseURL } : {}),
   });
 }
