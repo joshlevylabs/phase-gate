@@ -46,7 +46,10 @@ program
   .option("--model <model>", "Claude model to use", DEFAULT_MODEL)
   .option("--overwrite", "Overwrite existing plan (default: merge new tests)", false)
   .action(async (phase: string, opts) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.CORTEX_API_KEY;
+    const apiKey =
+      process.env.ANTHROPIC_API_KEY ??
+      process.env.CORTEX_API_KEY ??
+      process.env.SONANCE_CORTEX_API_KEY;
     if (!apiKey) {
       console.error(chalk.red("Error: ANTHROPIC_API_KEY or CORTEX_API_KEY env var required"));
       process.exit(1);
@@ -96,7 +99,10 @@ program
   .option("--gate", "Exit with code 1 if phase gate is not cleared", false)
   .option("--model <model>", "Claude model for LLM judgment", DEFAULT_MODEL)
   .action(async (phase: string, opts) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.CORTEX_API_KEY;
+    const apiKey =
+      process.env.ANTHROPIC_API_KEY ??
+      process.env.CORTEX_API_KEY ??
+      process.env.SONANCE_CORTEX_API_KEY;
     if (!apiKey) {
       console.error(chalk.red("Error: ANTHROPIC_API_KEY or CORTEX_API_KEY env var required"));
       process.exit(1);
@@ -139,7 +145,10 @@ program
   .option("-f, --format <formats>", "Output formats", "xlsx,md,html,json")
   .option("--model <model>", "Claude model to use", DEFAULT_MODEL)
   .action(async (phase: string, opts) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.CORTEX_API_KEY;
+    const apiKey =
+      process.env.ANTHROPIC_API_KEY ??
+      process.env.CORTEX_API_KEY ??
+      process.env.SONANCE_CORTEX_API_KEY;
     if (!apiKey) {
       console.error(chalk.red("Error: ANTHROPIC_API_KEY or CORTEX_API_KEY env var required"));
       process.exit(1);
