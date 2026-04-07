@@ -18,6 +18,8 @@ export interface TestCase {
   autoInspect?: { file: string; pattern: string };
   /** Must PASS for phase gate to clear */
   gating: boolean;
+  /** Actual output captured during the last run (for trust-but-verify) */
+  actualOutput?: string;
   lastRunAt?: string;
   runCount: number;
   /** Auto-generated fix attempt count */

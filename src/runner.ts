@@ -34,12 +34,17 @@ export async function runPlan(
 
     let result: TestResult = "NOT TESTED";
     let notes = test.notes;
+    let actualOutput: string | undefined;
 
     try {
       if (test.autoInspect) {
-        result = runInspect(test, plan.projectRoot);
+        const inspectResult = runInspect(test, plan.projectRoot);
+        result = inspectResult.result;
+        actualOutput = inspectResult.output;
       } else if (test.autoCommand) {
-        result = await runCommand(test, plan.projectRoot, client, model);
+        const cmdResult = await runCommand(test, plan.projectRoot, client, model);
+        result = cmdResult.result;
+        actualOutput = cmdResult.output;
       } else {
         result = "NOT TESTED";
         notes = notes || "Manual test — run steps in 'How To Test' column";
@@ -51,6 +56,7 @@ export async function runPlan(
 
     test.result = result;
     test.notes = notes;
+    test.actualOutput = actualOutput;
     test.lastRunAt = new Date().toISOString();
     test.runCount = (test.runCount || 0) + 1;
 
@@ -109,13 +115,19 @@ export async function runPlan(
   };
 }
 
-function runInspect(test: TestCase, projectRoot: string): TestResult {
+function runInspect(test: TestCase, projectRoot: string): { result: TestResult; output: string } {
   const { file, pattern } = test.autoInspect!;
   const fullPath = join(projectRoot, file);
-  if (!existsSync(fullPath)) return "FAIL";
+  if (!existsSync(fullPath)) {
+    return { result: "FAIL", output: `File not found: ${fullPath}` };
+  }
   const content = readFileSync(fullPath, "utf8");
   const regex = new RegExp(pattern);
-  return regex.test(content) ? "PASS" : "FAIL";
+  const matches = content.match(new RegExp(pattern + ".*", "gm")) ?? [];
+  const output = matches.length > 0
+    ? matches.slice(0, 5).join("\n")
+    : `Pattern not found: ${pattern}`;
+  return { result: regex.test(content) ? "PASS" : "FAIL", output };
 }
 
 async function runCommand(
@@ -123,7 +135,7 @@ async function runCommand(
   projectRoot: string,
   client: Anthropic,
   model: string
-): Promise<TestResult> {
+): Promise<{ result: TestResult; output: string }> {
   let stdout = "";
   let stderr = "";
   let exitCode = 0;
@@ -159,6 +171,6 @@ async function runCommand(
   });
 
   const verdict = (judgment.content[0] as { text: string }).text.trim().toUpperCase();
-  if (verdict !== "PASS" && verdict !== "FAIL") return exitCode === 0 ? "PASS" : "FAIL";
-  return verdict as TestResult;
+  const result: TestResult = (verdict === "PASS" || verdict === "FAIL") ? verdict : (exitCode === 0 ? "PASS" : "FAIL");
+  return { result, output: output || "(no output)" };
 }

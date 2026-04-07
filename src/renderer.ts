@@ -114,11 +114,14 @@ function renderHtml(plan: PhaseTestPlan, outputDir: string): void {
   const rows = (() => {
     const categories = [...new Set(plan.tests.map((t) => t.category))];
     return categories.map((cat) => {
-      const header = `<tr class="section-header"><td colspan="7">${esc(cat)}</td></tr>`;
+      const header = `<tr class="section-header"><td colspan="8">${esc(cat)}</td></tr>`;
       const tests = plan.tests.filter((t) => t.category === cat).map((tc) => {
         const color = RESULT_COLOR[tc.result] ?? "#6b7280";
-        const badge = tc.result === "NOT TESTED" ? "" : `<span class="badge" style="background:${color}">${tc.result}</span>`;
-        return `<tr><td class="id">${tc.id}</td><td>${esc(tc.category)}</td><td>${esc(tc.description)}</td><td><pre>${esc(tc.howToTest)}</pre></td><td>${esc(tc.expectedResult)}</td><td>${badge}</td><td>${esc(tc.notes)}</td></tr>`;
+        const badge = tc.result === "NOT TESTED" ? `<span style="color:#9ca3af;font-size:11px">—</span>` : `<span class="badge" style="background:${color}">${tc.result}</span>`;
+        const actual = tc.actualOutput
+          ? `<pre class="actual">${esc(tc.actualOutput)}</pre>`
+          : `<span style="color:#9ca3af;font-size:11px">—</span>`;
+        return `<tr data-result="${tc.result}"><td class="id">${tc.id}</td><td>${esc(tc.category)}</td><td>${esc(tc.description)}</td><td><pre>${esc(tc.howToTest)}</pre></td><td>${esc(tc.expectedResult)}</td><td>${actual}</td><td>${badge}</td><td>${esc(tc.notes)}</td></tr>`;
       }).join("");
       return header + tests;
     }).join("");
@@ -147,6 +150,7 @@ tr.section-header td{background:#f0f4f8;font-weight:700;color:var(--charcoal);fo
 tr:hover td{background:#fafaf9}
 td.id{font-family:monospace;font-size:12px;color:var(--beam);white-space:nowrap}
 pre{margin:0;font-size:11px;white-space:pre-wrap;word-break:break-word;background:#f6f8fa;padding:7px;border-radius:4px;border:1px solid #e1e4e8}
+pre.actual{background:#fffbf0;border-color:#fde68a;color:#92400e}
 .badge{display:inline-block;padding:2px 9px;border-radius:10px;color:#fff;font-size:11px;font-weight:700;letter-spacing:.04em}
 </style></head><body>
 <header><h1>${plan.phase}: ${esc(plan.title)} — Test Plan</h1><p>Generated ${plan.generatedAt} · Last run: ${plan.lastRunAt ?? "Never"}</p></header>
@@ -166,7 +170,7 @@ pre{margin:0;font-size:11px;white-space:pre-wrap;word-break:break-word;backgroun
 <button class="fbtn" onclick="filter('NOT TESTED',this)">Not Tested</button>
 <button class="fbtn" onclick="filter('BLOCKED',this)">Blocked</button>
 </div>
-<table><thead><tr><th style="width:70px">ID</th><th style="width:130px">Section</th><th style="width:200px">Description</th><th style="width:260px">How To Test</th><th style="width:200px">Expected</th><th style="width:90px">Result</th><th>Notes</th></tr></thead>
+<table><thead><tr><th style="width:60px">ID</th><th style="width:110px">Section</th><th style="width:180px">Description</th><th style="width:220px">How To Test</th><th style="width:180px">Expected</th><th style="width:200px">Actual Output</th><th style="width:80px">Result</th><th>Notes</th></tr></thead>
 <tbody id="tb">${rows}</tbody></table></main>
 <script>
 function filter(r,btn){
@@ -174,8 +178,7 @@ function filter(r,btn){
   btn.classList.add('active');
   document.querySelectorAll('#tb tr').forEach(row=>{
     if(row.classList.contains('section-header')){row.style.display='';return}
-    const b=row.querySelector('.badge');
-    const v=b?b.textContent.trim():'NOT TESTED';
+    const v=row.dataset.result||'NOT TESTED';
     row.style.display=(r==='ALL'||v===r)?'':'none';
   });
 }
