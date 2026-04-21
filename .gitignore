@@ -3,3 +3,4 @@ dist/
 *.env
 .env
 docs/test-plans/
+test.md

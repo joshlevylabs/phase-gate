@@ -7,19 +7,32 @@ import { makeClient } from "./client.ts";
 import { readFileSync } from "fs";
 import type { PhaseTestPlan, TestCase } from "./types.ts";
 
-const SYSTEM_PROMPT = `You are a senior QA engineer. Given a section of an implementation roadmap, you generate a focused, executable test plan.
+const SYSTEM_PROMPT = `You are a senior QA engineer. Given a section of an implementation roadmap, you generate a COMPLETE test plan that covers EVERY scenario a phase needs in order to be truly "done" — including work that only a human can verify.
 
 For each test case you generate:
 - id: sequential within the phase, e.g. "1.1", "1.2", "2.1"
-- category: group related tests (e.g. "Environment Setup", "Config Loader", "HTTP Server", "Build", "Type Safety")
+- category: group related tests (e.g. "Environment Setup", "Config Loader", "HTTP Server", "Build", "Type Safety", "Infrastructure Wiring", "Usability", "Accessibility")
 - description: one clear sentence of what is being verified
-- howToTest: exact copy-pasteable shell commands or numbered steps
+- executor: "auto" if a shell command or file inspection can verify it; "human" if it requires a person (infra wiring in a cloud console, usability judgement, visual inspection, physical hardware, third-party account setup, accessibility check, data entry, etc.)
+- howToTest: exact copy-pasteable shell commands (auto) OR numbered steps a human follows (human)
+- humanInstructions: when executor=human, plain-language instructions for the tester (omit for auto)
+- humanKind: when executor=human, one of: "infrastructure" | "usability" | "visual" | "hardware" | "third-party" | "accessibility" | "data-entry" | "other"
 - expectedResult: the exact observable outcome that constitutes PASS
-- gating: true if this test MUST pass before progressing to the next phase, false for nice-to-have
-- autoCommand: single shell command to verify (or null)
-- autoInspect: { file, pattern } for code inspection tests (or null)
+- gating: true if this test is NECESSARY — i.e. the phase is NOT done without it. false if it is optional / nice-to-have. A NECESSARY human test will block the phase gate until a human marks it PASS, so be honest about what is truly required.
+- autoCommand: single shell command to verify (auto only; null otherwise)
+- autoInspect: { file, pattern } for code inspection tests (auto only; null otherwise)
 
-IMPORTANT: Generate at most 25 test cases total. Focus on the most critical gating tests. Omit redundant checks.
+CRITICAL — include human tests whenever they are needed:
+- Infrastructure wiring that lives outside the repo (DNS, OAuth app registration, cloud console steps, secrets in vaults, webhook URLs, certificate installation, IAM roles)
+- Usability / UX flows ("the error message is actually understandable", "the empty state makes sense")
+- Visual inspection (layout, theme, charts render correctly, brand compliance)
+- Physical hardware (device paired, sensor reading correct, printer output)
+- Third-party integrations needing a real sandbox/account
+- Accessibility (screen reader, keyboard nav, contrast)
+- Data entry / content authoring
+- Anything where "the code compiles and the command exits 0" does NOT prove the phase is actually complete
+
+There is NO LIMIT on the number of test cases. Generate every test that is needed for full coverage — auto tests AND human tests. Do not omit a necessary test just to keep the list short. Do not invent redundant tests either.
 
 Respond ONLY with a valid JSON array. No markdown, no explanation — just the JSON array.`;
 
@@ -37,7 +50,7 @@ export async function generatePlan(
 
   const response = await client.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: 16000,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -84,14 +97,19 @@ For commands that require env vars, show them inline: ENV_VAR=value command`,
   }
 
   // Normalize fields
-  tests = tests.map((t) => ({
-    ...t,
-    result: "NOT TESTED" as const,
-    notes: "",
-    runCount: 0,
-    fixAttempts: 0,
-    gating: t.gating ?? true,
-  }));
+  tests = tests.map((t) => {
+    const executor = t.executor === "human" ? "human" : "auto";
+    const initialResult = executor === "human" ? "AWAITING HUMAN" : "NOT TESTED";
+    return {
+      ...t,
+      executor,
+      result: initialResult as TestCase["result"],
+      notes: "",
+      runCount: 0,
+      fixAttempts: 0,
+      gating: t.gating ?? true,
+    };
+  });
 
   // Extract phase title from roadmap
   const titleMatch = phaseSection.match(/^#+ .*(Milestone \d+|M\d+)[:\s–-]+(.+)$/m);

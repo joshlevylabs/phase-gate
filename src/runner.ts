@@ -37,7 +37,15 @@ export async function runPlan(
     let actualOutput: string | undefined;
 
     try {
-      if (test.autoInspect) {
+      if (test.executor === "human") {
+        // Preserve any prior human verdict (PASS / FAIL); otherwise mark awaiting.
+        if (test.result === "PASS" || test.result === "FAIL" || test.result === "BLOCKED") {
+          result = test.result;
+        } else {
+          result = "AWAITING HUMAN";
+          notes = notes || "Human test — open the HTML report and click PASS/FAIL after verifying.";
+        }
+      } else if (test.autoInspect) {
         const inspectResult = runInspect(test, plan.projectRoot);
         result = inspectResult.result;
         actualOutput = inspectResult.output;
@@ -76,10 +84,25 @@ export async function runPlan(
   }
 
   plan.lastRunAt = new Date().toISOString();
+  if (!plan.version) plan.version = 1;
 
   // Check gate: all gating tests must PASS
   const gatingTests = plan.tests.filter((t) => t.gating);
   plan.gateCleared = gatingTests.length > 0 && gatingTests.every((t) => t.result === "PASS");
+
+  // Append run to history
+  if (!plan.history) plan.history = [];
+  plan.history.push({
+    version: plan.version,
+    runAt: plan.lastRunAt,
+    total: plan.tests.length,
+    pass: plan.tests.filter((t) => t.result === "PASS").length,
+    fail: plan.tests.filter((t) => t.result === "FAIL").length,
+    awaitingHuman: plan.tests.filter((t) => t.result === "AWAITING HUMAN").length,
+    blocked: plan.tests.filter((t) => t.result === "BLOCKED").length,
+    notTested: plan.tests.filter((t) => t.result === "NOT TESTED").length,
+    gateCleared: plan.gateCleared,
+  });
 
   const total = plan.tests.length;
   const durationMs = Date.now() - start;

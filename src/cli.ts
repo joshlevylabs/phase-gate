@@ -22,6 +22,7 @@ import { runPlan } from "./runner.ts";
 import { fixFailures } from "./fixer.ts";
 import { render } from "./renderer.ts";
 import { savePlan, loadPlan } from "./store.ts";
+import { serve } from "./serve.ts";
 import type { OutputFormat } from "./types.ts";
 
 const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
@@ -226,6 +227,40 @@ program
       failing.forEach((t) => console.log(chalk.red(`  • [${t.id}] ${t.description} (${t.result})`)));
       process.exit(1);
     }
+  });
+
+// ─── serve ────────────────────────────────────────────────────────────────────
+
+program
+  .command("serve [phase]")
+  .description("Launch the Phase Gate web dashboard (generate, run, and mark tests from the browser)")
+  .option("-o, --output <dir>", "Output directory for test plans", DEFAULT_OUTPUT_DIR)
+  .option("-r, --roadmap <path>", "Default roadmap path to prefill in the dashboard")
+  .option("--project <path>", "Default project root to prefill in the dashboard")
+  .option("-p, --port <port>", "Port to listen on", "4477")
+  .option("-f, --format <formats>", "Formats to render", "xlsx,md,html,json")
+  .option("--model <model>", "Claude model for generation and judging", DEFAULT_MODEL)
+  .action(async (phase: string | undefined, opts) => {
+    const apiKey =
+      process.env.ANTHROPIC_API_KEY ??
+      process.env.CORTEX_API_KEY ??
+      process.env.SONANCE_CORTEX_API_KEY;
+    if (!apiKey) {
+      console.error(chalk.red("Error: ANTHROPIC_API_KEY or CORTEX_API_KEY env var required"));
+      process.exit(1);
+    }
+    const outputDir = resolve(opts.output);
+    const formats = opts.format.split(",").map((f: string) => f.trim()) as OutputFormat[];
+    await serve({
+      outputDir,
+      port: parseInt(opts.port, 10),
+      formats,
+      apiKey,
+      model: opts.model,
+      defaultRoadmap: opts.roadmap ? resolve(opts.roadmap) : undefined,
+      defaultProjectRoot: opts.project ? resolve(opts.project) : undefined,
+    });
+    if (phase) console.log(chalk.gray(`   (tip: open http://localhost:${opts.port}/report/${phase} for the ${phase} report directly)`));
   });
 
 // ─── status ───────────────────────────────────────────────────────────────────
